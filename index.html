@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Surf Check</title>
+        <style>
+            :root {
+                --accent: #0b6e99;
+                --border: #e5e7eb;
+                --muted: #6b7280;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                font-family: system-ui, sans-serif;
+                color: #111827;
+                background: #fff;
+                display: flex;
+                justify-content: center;
+                padding: 2rem 1rem;
+            }
+            main {
+                width: 100%;
+                max-width: 680px;
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+                color: var(--accent);
+            }
+            header p {
+                color: var(--muted);
+                font-size: 0.9rem;
+                margin-top: 0.25rem;
+                line-height: 1.4;
+            }
+            #examples {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .chip {
+                background: none;
+                color: var(--accent);
+                border: 1px solid var(--accent);
+                border-radius: 999px;
+                padding: 0.35rem 0.8rem;
+                font-size: 0.8rem;
+            }
+            #messages {
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1rem;
+                min-height: 360px;
+                max-height: 60vh;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            #empty {
+                color: var(--muted);
+                font-size: 0.9rem;
+                margin: auto;
+                text-align: center;
+            }
+            .msg {
+                max-width: 85%;
+                padding: 0.6rem 0.85rem;
+                border-radius: 8px;
+                line-height: 1.5;
+                white-space: pre-wrap;
+            }
+            .msg.user {
+                align-self: flex-end;
+                background: var(--accent);
+                color: #fff;
+            }
+            .msg.agent {
+                align-self: flex-start;
+                background: #f3f4f6;
+            }
+            .msg.loading {
+                color: var(--muted);
+            }
+            details.tool {
+                align-self: flex-start;
+                max-width: 85%;
+                font-family: ui-monospace, monospace;
+                font-size: 0.75rem;
+                border-left: 3px solid var(--accent);
+                background: #f0f7fa;
+                padding: 0.4rem 0.6rem;
+            }
+            details.tool summary {
+                cursor: pointer;
+                color: var(--accent);
+            }
+            details.tool pre {
+                margin-top: 0.4rem;
+                white-space: pre-wrap;
+                word-break: break-word;
+                color: #374151;
+            }
+            form {
+                display: flex;
+                gap: 0.5rem;
+            }
+            input {
+                flex: 1;
+                padding: 0.7rem 0.85rem;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-size: 1rem;
+                outline: none;
+            }
+            input:focus {
+                border-color: var(--accent);
+            }
+            button {
+                cursor: pointer;
+                font-family: inherit;
+            }
+            .primary {
+                background: var(--accent);
+                color: #fff;
+                border: none;
+                border-radius: 8px;
+                padding: 0 1.2rem;
+                font-size: 0.9rem;
+            }
+            .secondary {
+                background: none;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.4rem 0.8rem;
+                font-size: 0.8rem;
+                color: var(--muted);
+                white-space: nowrap;
+            }
+            button:disabled {
+                opacity: 0.4;
+                cursor: default;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <header>
+                <div>
+                    <h1>Surf Check</h1>
+                    <p>
+                        Ask whether it's worth paddling out. Name a beach town and,
+                        optionally, your level (beginner, intermediate, advanced). I check
+                        live waves, wind, water temperature and tides.
+                    </p>
+                </div>
+                <button id="new-chat" class="secondary">New chat</button>
+            </header>
+
+            <div id="examples">
+                <button class="chip">How's the surf at Montauk right now? I'm a beginner.</button>
+                <button class="chip">Best day to surf Huntington Beach this week?</button>
+                <button class="chip">What wetsuit do I need in Pacifica, and when is low tide?</button>
+            </div>
+
+            <div id="messages">
+                <p id="empty">Try an example above, or ask about any beach.</p>
+            </div>
+
+            <form id="chat-form">
+                <input id="user-input" placeholder="e.g. Should I surf Santa Cruz today?" autocomplete="off" />
+                <button id="send-btn" class="primary" type="submit">Send</button>
+            </form>
+        </main>
+
+        <script>
+            const messages = document.getElementById("messages");
+            const userInput = document.getElementById("user-input");
+            const sendBtn = document.getElementById("send-btn");
+            const emptyHtml = messages.innerHTML;
+            let sessionId = null;
+
+            function addMessage(kind, text) {
+                document.getElementById("empty")?.remove();
+                const div = document.createElement("div");
+                div.className = "msg " + kind;
+                div.textContent = text;
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+                return div;
+            }
+
+            function toolCard(call) {
+                const details = document.createElement("details");
+                details.className = "tool";
+                const summary = document.createElement("summary");
+                summary.textContent = "tool: " + call.name + "(" + JSON.stringify(call.args) + ")";
+                const pre = document.createElement("pre");
+                try {
+                    pre.textContent = JSON.stringify(JSON.parse(call.result), null, 2);
+                } catch {
+                    pre.textContent = call.result;
+                }
+                details.append(summary, pre);
+                return details;
+            }
+
+            async function send(text) {
+                text = text.trim();
+                if (!text || sendBtn.disabled) return;
+                userInput.value = "";
+                sendBtn.disabled = true;
+                addMessage("user", text);
+                const reply = addMessage("agent loading", "Checking the ocean...");
+
+                try {
+                    const res = await fetch("/chat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: text, session_id: sessionId }),
+                    });
+                    const data = await res.json();
+                    sessionId = data.session_id;
+                    for (const call of data.tool_calls || []) {
+                        messages.insertBefore(toolCard(call), reply);
+                    }
+                    reply.textContent = data.response;
+                } catch (e) {
+                    reply.textContent = "Error: " + e.message;
+                }
+                reply.classList.remove("loading");
+                messages.scrollTop = messages.scrollHeight;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+
+            document.getElementById("chat-form").addEventListener("submit", (e) => {
+                e.preventDefault();
+                send(userInput.value);
+            });
+
+            for (const chip of document.querySelectorAll(".chip")) {
+                chip.addEventListener("click", () => send(chip.textContent));
+            }
+
+            document.getElementById("new-chat").addEventListener("click", async () => {
+                if (sessionId) {
+                    await fetch("/clear?session_id=" + encodeURIComponent(sessionId), { method: "POST" });
+                }
+                sessionId = null;
+                messages.innerHTML = emptyHtml;
+                userInput.focus();
+            });
+
+            userInput.focus();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,12 @@
+[project]
+name = "surf-check"
+version = "0.1.0"
+description = "Surf Check: a Gemini tool-calling agent that scores live surf, ranks the week, picks a wetsuit and finds tides"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "litellm>=1.50",
+    "google-cloud-aiplatform>=1.40.0",
+    "requests>=2.31",
+]
